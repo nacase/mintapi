@@ -1,6 +1,7 @@
 import json
 import random
 import time
+import sys
 
 try:
     from StringIO import StringIO  # Python 2
@@ -141,7 +142,7 @@ class Mint(requests.Session):
         # Issue service request.
         req_id = str(self.request_id)
 
-        input = {
+        data_input = {
             'args': {
                 'types': [
                     'BANK',
@@ -161,7 +162,7 @@ class Mint(requests.Session):
             # 'task': 'getAccountsSortedByBalanceDescending'
         }
 
-        data = {'input': json.dumps([input])}
+        data = {'input': json.dumps([data_input])}
         account_data_url = ('https://wwws.mint.com/bundledServiceController.'
                             'xevent?legacy=false&token=' + self.token)
         response = self.post(account_data_url, data=data,
@@ -345,7 +346,7 @@ class Mint(requests.Session):
         # account types in this list will be subtracted
         negative_accounts = ['loan', 'loans', 'credit']
         try:
-            net_worth = long()
+            net_worth = int()
         except NameError:
             net_worth = 0
 
@@ -483,17 +484,19 @@ class Mint(requests.Session):
         ).text)
 
         # Make the skeleton return structure
+        if sys.version_info[0] == 2:
+            income_key = str(max(map(int, response['data']['income'].keys())))
+        else:
+            income_key = str(max(list(map(int, list(response['data'] \
+                                                    ['income'].keys())))))
+
         budgets = {
-            'income': response['data']['income'][
-                str(max(map(int, response['data']['income'].keys())))
-            ]['bu'],
-            'spend': response['data']['spending'][
-                str(max(map(int, response['data']['income'].keys())))
-            ]['bu']
+            'income': response['data']['income'][income_key]['bu'],
+            'spend': response['data']['spending'][income_key]['bu']
         }
 
         # Fill in the return structure
-        for direction in budgets.keys():
+        for direction in list(budgets.keys()):
             for budget in budgets[direction]:
                 budget['cat'] = self.get_category_from_id(
                     budget['cat'],
@@ -539,14 +542,14 @@ def get_net_worth(email, password):
 
 def make_accounts_presentable(accounts):
     for account in accounts:
-        for k, v in account.items():
+        for k, v in list(account.items()):
             if isinstance(v, datetime):
                 account[k] = repr(v)
     return accounts
 
 
 def print_accounts(accounts):
-    print(json.dumps(make_accounts_presentable(accounts), indent=2))
+    print((json.dumps(make_accounts_presentable(accounts), indent=2)))
 
 
 def get_budgets(email, password):
@@ -600,10 +603,12 @@ def main():
         cmdline.error('--keyring can only be used if the `keyring` '
                       'library is installed.')
 
-    try:
+    if sys.version_info[0] == 2:
         from __builtin__ import raw_input as input
-    except NameError:
-        pass
+    else:
+        # prevent interpreter from treating 'input' as local variable
+        # and throwing UnboundLocalError when calling input() later on
+        from builtins import input
 
     # Try to get the e-mail and password from the arguments
     email = options.email
@@ -670,7 +675,7 @@ def main():
     # output the data
     if options.transactions:
         if options.filename is None:
-            print(data.to_json(orient='records'))
+            print((data.to_json(orient='records')))
         elif options.filename.endswith('.csv'):
             data.to_csv(options.filename, index=False)
         elif options.filename.endswith('.json'):
@@ -679,7 +684,7 @@ def main():
             raise ValueError('file extension must be either .csv or .json')
     else:
         if options.filename is None:
-            print(json.dumps(data, indent=2))
+            print((json.dumps(data, indent=2)))
         elif options.filename.endswith('.json'):
             with open(options.filename, 'w+') as f:
                 json.dump(data, f, indent=2)

@@ -53,15 +53,27 @@ class Mint(requests.Session):
     request_id = 42  # magic number? random number?
     token = None
 
-    def __init__(self, email=None, password=None):
+    def __init__(self, email=None, password=None, debug=False):
         requests.Session.__init__(self)
+        if debug:
+            import logging
+            try:
+                import http.client as http_client
+            except ImportError:
+                import httplib as http_client   # Python 2
+            http_client.HTTPConnection.debuglevel = 2
+            logging.basicConfig()
+            logging.getLogger().setLevel(logging.DEBUG)
+            requests_log = logging.getLogger("requests.packages.urllib3")
+            requests_log.setLevel(logging.DEBUG)
+            requests_log.propagate = True
         self.mount('https://', MintHTTPSAdapter())
         if email and password:
             self.login_and_get_token(email, password)
 
     @classmethod
-    def create(cls, email, password):  # {{{
-        mint = Mint()
+    def create(cls, email, password, debug=False):  # {{{
+        mint = Mint(debug=debug)
         mint.login_and_get_token(email, password)
         return mint
 

@@ -191,6 +191,32 @@ class Mint(requests.Session):
             accounts = self.populate_extended_account_detail(accounts)
         return accounts
 
+    def get_tags(self, get_detail=False):  # {{{
+        # Issue service request.
+        req_id = str(self.request_id)
+
+        data_input = {
+            'args': {},
+            'id': req_id,
+            'service': 'MintTransactionService',
+            'task': 'getTagsByFrequency'
+        }
+
+        data = {'input': json.dumps([data_input])}
+        account_data_url = ('https://wwws.mint.com/bundledServiceController.'
+                            'xevent?legacy=false&token=' + self.token)
+        response = self.post(account_data_url, data=data,
+                             headers=self.json_headers).text
+        self.request_id = self.request_id + 1
+        if req_id not in response:
+            raise Exception('Could not parse account data: ' + response)
+
+        # Parse the request
+        response = json.loads(response)
+        tags = response['response'][req_id]['response']
+
+        return tags
+
     def set_user_property(self, name, value):
         url = ('https://wwws.mint.com/bundledServiceController.xevent?' +
                'legacy=false&token=' + self.token)

@@ -229,6 +229,52 @@ class Mint(requests.Session):
 
         return tags
 
+    def get_trends_history(self, report_type, accounts=[]):  # {{{
+        """Query trend history for all accounts.  @report_type is one of:
+            'NW': Net worth over time,
+            'AT': Assets over time,
+            'DT': Debts over time,
+            'IT': Income over time.
+           @accounts can be a list of account IDs, or leave as []
+           to return data for all accounts.
+        """
+        headers = self.json_headers
+        headers['Referer'] = ('https://wwws.mint.com/trend.event')
+
+        nw_trends_url = ('https://wwws.mint.com/trendData.xevent')
+
+        req_id = str(self.request_id)
+        data = {
+            'searchQuery': json.dumps({
+                'reportType': report_type,
+                'matchAny': True,
+                'terms': [],
+                'accounts': {'groupIds': ['AA',],
+                             'accountIds': accounts},
+                'dateRange': {
+                    'period': {
+                        'label': 'All time',
+                        'value': 'AT',
+                    },
+                },
+                'drillDown': None,
+                'categoryTypeFilter': 'all',
+            }),
+            'token': self.token,
+        }
+
+        response = self.post(nw_trends_url, data=data, headers=headers, allow_redirects=False)
+
+        if response.headers.get('location') and response.headers.get('location').endswith('internalError.event'):
+            #print('response location: ' + str(response.headers.get('location')))
+            raise Exception('Server returned internal error: ' + response.text)
+        resp_txt = response.text
+        self.request_id = self.request_id + 1
+        if req_id not in resp_txt:
+            raise Exception('Could not parse trends data: "'
+                            + resp_txt + '"')
+        return json.loads(resp_txt)
+
     def set_user_property(self, name, value):
         url = ('https://wwws.mint.com/bundledServiceController.xevent?' +
                'legacy=false&token=' + self.token)
